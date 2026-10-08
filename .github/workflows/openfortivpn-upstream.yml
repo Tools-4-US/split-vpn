@@ -1,0 +1,41 @@
+# O openfortivpn vem do Homebrew e fica fora do alcance do Dependabot.
+# Toda segunda-feira compara a versão testada (apps/macos/OPENFORTIVPN_VERSION)
+# com a última tag do projeto e abre uma issue quando houver versão nova.
+name: openfortivpn upstream
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Comparar versões
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tested=$(tr -d '[:space:]' < apps/macos/OPENFORTIVPN_VERSION)
+          latest=$(gh api repos/adrienverge/openfortivpn/tags --paginate --jq '.[].name' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed 's/^v//' | sort -V | tail -1)
+          echo "testada=$tested ultima=$latest"
+          [ -n "$latest" ] && [ "$latest" != "$tested" ] || exit 0
+          title="openfortivpn $latest disponível (testada: $tested)"
+          if gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[].number' | grep -q .; then
+            echo "Issue já aberta."; exit 0
+          fi
+          gh issue create --title "$title" --label dependencies --body "$(cat <<BODY
+          Saiu o openfortivpn **$latest** (o Geleit para macOS foi testado com **$tested**).
+
+          - Notas: https://github.com/adrienverge/openfortivpn/blob/master/CHANGELOG.md
+          - Testar: \`brew upgrade openfortivpn\`, conectar com SSO e com usuário/senha, e reconexão.
+          - Se tudo passar, atualize \`apps/macos/OPENFORTIVPN_VERSION\` e feche esta issue.
+          BODY
+          )" || gh issue create --title "$title" --body "Testar e atualizar apps/macos/OPENFORTIVPN_VERSION."

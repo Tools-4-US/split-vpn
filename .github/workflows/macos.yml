@@ -1,0 +1,36 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/macos/**", ".github/workflows/macos.yml"]
+  pull_request:
+    paths: ["apps/macos/**", ".github/workflows/macos.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: apps/macos
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Lint dos scripts com privilégio
+        run: |
+          command -v shellcheck >/dev/null || brew install shellcheck
+          shellcheck -S warning -e SC2024 build.sh install-helper.sh helper/geleit-helper
+
+      - name: Build e empacotamento
+        run: ./build.sh
+
+      - name: Compactar o app
+        run: ditto -c -k --keepParent build/Geleit.app build/Geleit-macOS.zip
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Geleit-macOS
+          path: apps/macos/build/Geleit-macOS.zip

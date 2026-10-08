@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Tools-4-US/split-vpn/spec/profile.schema.json",
+  "title": "Geleit connection profiles",
+  "description": "Saved connections, shared by every Geleit client. macOS stores them at ~/Library/Application Support/Geleit/profiles.json. Passwords are never stored here; they live in the platform's secret store.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/profile" },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": ["id", "name", "gateway", "port", "authMode", "routingMode"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string", "description": "Free-form description" },
+        "gateway": { "type": "string", "pattern": "^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 443 },
+        "authMode": { "enum": ["sso", "password"] },
+        "username": { "type": "string", "pattern": "^[A-Za-z0-9._@+\\-]{0,128}$" },
+        "savePassword": { "type": "boolean", "default": false },
+        "realm": { "type": "string", "pattern": "^([A-Za-z0-9._-]{1,64})?$" },
+        "trustedCert": { "type": "string", "pattern": "^([0-9a-fA-F]{64})?$", "description": "SHA-256 of the gateway certificate, only for untrusted certificates" },
+        "samlPort": { "type": "integer", "minimum": 1024, "maximum": 65535, "default": 8020 },
+        "routingMode": { "enum": ["split", "full"] },
+        "routes": {
+          "type": "array",
+          "description": "IPv4 networks sent through the tunnel in split mode",
+          "items": { "type": "string", "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$" }
+        },
+        "dnsDomains": {
+          "type": "array",
+          "description": "Domains (and subdomains) resolved by the VPN's DNS servers",
+          "items": { "type": "string" }
+        },
+        "autoReconnect": { "type": "boolean", "default": true }
+      }
+    }
+  }
+}

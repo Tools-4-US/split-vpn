@@ -1,0 +1,15 @@
+# Atualizações automáticas de dependências, por cliente do monorepo.
+# Ao adicionar um cliente novo (apps/windows, apps/linux…), inclua o ecossistema dele aqui.
+version: 2
+updates:
+  - package-ecosystem: "swift"
+    directory: "/apps/macos"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "macos"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
