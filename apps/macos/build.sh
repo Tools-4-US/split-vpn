@@ -9,11 +9,18 @@ cd "$(dirname "$0")"
 
 APP="build/Geleit.app"
 VERSION="${VERSION:-0.0.0-dev}"
-swift build -c release --arch arm64 --arch x86_64
+# Uma arquitetura por vez + lipo: o build multi-arch do SwiftPM (--arch a --arch b) falha
+# em algumas versões do Xcode com "duplicate output file".
+for arch in arm64 x86_64; do
+  swift build -c release --arch "$arch"
+done
+mkdir -p build
+lipo -create .build/arm64-apple-macosx/release/Geleit .build/x86_64-apple-macosx/release/Geleit \
+  -output build/Geleit-universal
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/apple/Products/Release/Geleit "$APP/Contents/MacOS/Geleit"
+mv build/Geleit-universal "$APP/Contents/MacOS/Geleit"
 
 # Ícones fornecidos (opcionais): MenuBarIcon*.pdf|svg|png e AppIcon.icns ou AppIcon.png (1024x1024)
 shopt -s nullglob
