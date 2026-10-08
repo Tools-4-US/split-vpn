@@ -8,6 +8,10 @@
   A modern, split-tunnel client for Fortinet SSL-VPN gateways — SSO included.
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/connected.png" width="760" alt="Geleit console while connected: status, traffic and session details">
+</p>
+
 ---
 
 *Geleit* (German for "safe conduct", the armed escort that guaranteed safe passage along a road) is a lightweight VPN client for **FortiGate SSL-VPN** gateways. It sends **only the networks you choose** through the tunnel, resolves **only the domains you choose** with the VPN's DNS, and leaves everything else on your regular connection.
@@ -21,7 +25,7 @@ It is built on top of [openfortivpn](https://github.com/adrienverge/openfortivpn
 - **SSO (SAML) in your browser**, plus username/password authentication (passwords stored in the Keychain).
 - **One click from the menu bar**: pick a saved connection and the login starts.
 - **Live traffic**: bytes received/sent, current throughput and a two-minute chart.
-- **Automatic reconnection** with exponential backoff (5 s, 10 s, 20 s…) for up to 10 minutes. With SSO, the session is reused while the gateway accepts it; when it expires you get a notification to sign in again.
+- **Automatic reconnection** with exponential backoff (5 s, 10 s, 20 s…) for up to 10 minutes. Each attempt first checks that the gateway is reachable. With SSO, the session cookie is reused when it is still valid; when the gateway has ended the session, Geleit signs in again through the browser, which usually completes on its own while your identity provider session is alive.
 - **Certificate pinning** (SHA-256) for gateways with self-signed certificates.
 - Clean teardown: routes and DNS entries are removed when you disconnect or quit.
 

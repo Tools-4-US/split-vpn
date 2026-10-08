@@ -113,9 +113,10 @@ private struct EmptyStateView: View {
     let onCreate: () -> Void
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "shield.lefthalf.filled")
-                .font(.system(size: 54, weight: .light))
-                .foregroundStyle(Theme.accent)
+            PennantMark()
+                .frame(width: 96, height: 96)
+                .padding(18)
+                .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             Text("Nenhuma conexão configurada").font(.title2.weight(.semibold))
             Text("Adicione um gateway SSL-VPN (FortiGate) para começar.")
                 .foregroundStyle(.secondary)
@@ -163,7 +164,7 @@ struct ProfileDetailView: View {
     }
 }
 
-private struct HeroCard: View {
+struct HeroCard: View {
     @EnvironmentObject private var tunnel: TunnelController
     let profile: VPNProfile
     let phase: TunnelController.Phase
@@ -269,6 +270,16 @@ private struct StatusEmblem: View {
         }
     }
 
+    /// Selo para não depender só da cor para comunicar o estado.
+    private var badge: String? {
+        switch phase {
+        case .connected: return "checkmark"
+        case .failed: return "exclamationmark"
+        case .authenticating, .connecting, .reconnecting, .disconnecting: return "ellipsis"
+        case .idle: return nil
+        }
+    }
+
     var body: some View {
         ZStack {
             Circle().fill(.white.opacity(0.06)).frame(width: 92, height: 92)
@@ -276,18 +287,28 @@ private struct StatusEmblem: View {
                 .stroke(phase.color.opacity(busy ? (pulse ? 0.15 : 0.7) : 0.85), lineWidth: 3)
                 .frame(width: 92, height: 92)
                 .scaleEffect(busy && pulse ? 1.08 : 1)
-            Image(systemName: phase.symbol)
-                .font(.system(size: 38, weight: .regular))
-                .foregroundStyle(.white, phase.color)
-                .symbolRenderingMode(.palette)
+            PennantMark(stripe: phase == .idle ? Theme.accent : phase.color, waving: busy)
+                .frame(width: 64, height: 64)
+                .offset(x: 4)
+            if let badge {
+                Image(systemName: badge)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(phase.color, in: Circle())
+                    .overlay(Circle().stroke(Theme.navyTop, lineWidth: 2.5))
+                    .offset(x: 33, y: 33)
+            }
         }
+        .accessibilityElement()
+        .accessibilityLabel(phase.title)
         .onAppear { pulse = true }
         .animation(busy ? .easeInOut(duration: 1.1).repeatForever(autoreverses: true) : .default, value: pulse)
         .animation(.default, value: phase)
     }
 }
 
-private struct StatsRow: View {
+struct StatsRow: View {
     @EnvironmentObject private var tunnel: TunnelController
     @ObservedObject var traffic: TrafficMonitor
 
@@ -330,7 +351,7 @@ private struct StatTile: View {
     }
 }
 
-private struct TrafficChartCard: View {
+struct TrafficChartCard: View {
     @ObservedObject var traffic: TrafficMonitor
 
     var body: some View {
@@ -383,7 +404,7 @@ private struct LegendItem: View {
     }
 }
 
-private struct DetailsCard: View {
+struct DetailsCard: View {
     @EnvironmentObject private var tunnel: TunnelController
     let profile: VPNProfile
     let live: Bool

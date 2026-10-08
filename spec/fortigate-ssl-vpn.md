@@ -45,4 +45,8 @@ Lines in openfortivpn's output that clients rely on:
 
 ## Reconnection
 
-After a drop, clients retry with exponential backoff starting at 5 s, for a total window of 10 minutes. SSO profiles reuse the last cookie; if the gateway rejects it, the client stops and asks the user to sign in again instead of reopening the browser on its own.
+After a drop, clients retry with exponential backoff starting at 5 s, for a total window of 10 minutes.
+
+- Before each attempt, probe TCP reachability of the gateway; if it is unreachable, skip the attempt (and never open the browser).
+- **openfortivpn always logs out on exit** (`Logged out.`), which invalidates the SSO cookie on the gateway. The cookie only survives when the logout itself fails (`Could not log out.`), typically after a real network outage.
+- Therefore: if the previous tunnel logged out, or a retry fails with `Could not get VPN configuration`, discard the cookie and run the SSO flow again on the next attempt. With an active identity provider session this completes without user interaction in a few seconds; use a shorter timeout (90 s) than the first login.

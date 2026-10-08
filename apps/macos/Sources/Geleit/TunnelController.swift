@@ -53,6 +53,10 @@ final class TunnelController: ObservableObject {
     private var userStopping = false
     private var dropStartedAt: Date?
     private var attempt = 0
+    /// openfortivpn conseguiu fazer logout no gateway ao encerrar: o cookie SSO morreu junto.
+    private var loggedOut = false
+    /// Modo de demonstração (só debug): nada pode chegar ao helper.
+    private var demoMode = false
 
     init() {
         notifier.onAction = { [weak self] id in
@@ -90,6 +94,7 @@ final class TunnelController: ObservableObject {
     }
 
     func disconnect() {
+        guard !demoMode else { return }
         reconnectTask?.cancel()
         connectTask?.cancel()
         saml?.cancel()
@@ -111,6 +116,7 @@ final class TunnelController: ObservableObject {
 
     /// Chamado no encerramento do app: precisa ser síncrono.
     func shutdownSync() {
+        guard !demoMode else { return }
         reconnectTask?.cancel()
         connectTask?.cancel()
         saml?.cancel()
@@ -125,6 +131,7 @@ final class TunnelController: ObservableObject {
 
     #if DEBUG
     func loadDemo(profile: VPNProfile, mode: String) {
+        demoMode = true
         helperInstalled = true
         activeProfile = profile
         activeProfileID = profile.id
@@ -147,6 +154,7 @@ final class TunnelController: ObservableObject {
     // MARK: - Conexão
 
     private func establish(_ profile: VPNProfile, fresh: Bool) async {
+        guard !demoMode else { return }
         if helperInstalled != true {
             helperInstalled = await Helper.isInstalled()
             guard helperInstalled == true else {
@@ -155,22 +163,39 @@ final class TunnelController: ObservableObject {
             }
         }
 
+        let reconnecting = dropStartedAt != nil
+
+        // Durante a reconexão, só tenta (e só abre o navegador) se o gateway responder.
+        if reconnecting {
+            guard await RawHTTPS.canReach(host: profile.gateway, port: profile.port) else {
+                append("Gateway inacessível; nova tentativa mais tarde.")
+                scheduleReconnect(profile)
+                return
+            }
+        }
+
         // Credencial
         if secret == nil {
             switch profile.authMode {
             case .sso:
-                phase = .authenticating
-                append("Abrindo o login SSO no navegador…")
+                if !reconnecting { phase = .authenticating }
+                append(reconnecting ? "Sessão SSO encerrada pelo gateway; reautenticando no navegador…"
+                                    : "Abrindo o login SSO no navegador…")
                 let auth = SAMLAuth()
                 auth.diagnostic = { [weak self] line in Task { @MainActor in self?.append(line) } }
                 saml = auth
                 do {
-                    secret = try await auth.authenticate(profile: profile)
+                    // Com a sessão do provedor de identidade ainda válida, o login conclui sozinho
+                    // em poucos segundos; na reconexão não vale esperar os 5 minutos do primeiro login.
+                    secret = try await auth.authenticate(profile: profile, timeout: reconnecting ? 90 : 300)
                     append("Login SSO concluído.")
                 } catch {
                     saml = nil
                     if Task.isCancelled || (error as? SAMLError).map({ if case .cancelled = $0 { return true }; return false }) == true {
                         if activeProfileID == profile.id, !phase.isConnectedLike { phase = .idle }
+                    } else if reconnecting {
+                        append(error.localizedDescription)
+                        scheduleReconnect(profile)
                     } else {
                         fail(error.localizedDescription, profile: profile, offerRetry: true)
                     }
@@ -210,6 +235,7 @@ final class TunnelController: ObservableObject {
         let gen = generation
         tunnelUp = false
         authRejected = false
+        loggedOut = false
         userStopping = false
         localIP = nil; interface = nil; dnsServers = []; appliedRoutes = []
 
@@ -250,9 +276,11 @@ final class TunnelController: ObservableObject {
         if let m = line.firstMatch(of: #/Interface (\S+) is UP/#) { interface = String(m.1) }
         if lower.contains("could not authenticate") || lower.contains("invalid cookie")
             || lower.contains("permission denied") || lower.contains("login failed")
-            || (lower.contains("cookie") && lower.contains("expired")) {
+            || (lower.contains("cookie") && lower.contains("expired"))
+            || lower.contains("vpn configuration") {
             authRejected = true
         }
+        if lower.hasSuffix("logged out.") { loggedOut = true }
         if line.contains("Tunnel is up and running") {
             Task { await onTunnelUp(gen: gen) }
         }
@@ -313,7 +341,9 @@ final class TunnelController: ObservableObject {
         }
 
         if tunnelUp {
-            // Caiu depois de conectado.
+            // Caiu depois de conectado. Se o openfortivpn conseguiu fazer logout, o cookie
+            // SSO foi invalidado no gateway; a próxima tentativa precisa de novo login.
+            if loggedOut && profile.authMode == .sso { secret = nil }
             if profile.autoReconnect {
                 notifier.post(title: "Conexão caiu", body: "\(profile.displayName): tentando reconectar…")
                 scheduleReconnect(profile)
@@ -324,6 +354,12 @@ final class TunnelController: ObservableObject {
         }
 
         // Não chegou a subir.
+        if authRejected && profile.authMode == .sso && dropStartedAt != nil {
+            secret = nil
+            append("Sessão recusada pelo gateway; a próxima tentativa fará novo login SSO.")
+            scheduleReconnect(profile)
+            return
+        }
         if authRejected {
             secret = nil
             dropStartedAt = nil
@@ -377,7 +413,7 @@ final class TunnelController: ObservableObject {
     }
 
     private func cleanupNetwork(profile: VPNProfile?, gatewayIP: String?) async {
-        guard let profile else { return }
+        guard !demoMode, let profile else { return }
         for d in profile.dnsDomains { await Helper.run(["dns-clear", d]) }
         if profile.routingMode == .split, let gatewayIP { await Helper.run(["route-del-host", gatewayIP]) }
     }

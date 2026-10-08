@@ -49,17 +49,19 @@ Menu bar icons are drawn as template images (single color, transparent backgroun
 |---|---|
 | `Sources/Geleit/TunnelController.swift` | Connection lifecycle, routes/DNS, reconnection |
 | `Sources/Geleit/SAMLAuth.swift`, `RawHTTPS.swift` | Browser SSO and cookie exchange (see [`spec/`](../../spec/fortigate-ssl-vpn.md)) |
+| `Sources/Geleit/PennantMark.swift` | In-app emblem (vector pennant, stripe follows the connection state) |
 | `Sources/Geleit/TrafficMonitor.swift` | 64-bit interface counters via `sysctl(NET_RT_IFLIST2)` |
 | `helper/geleit-helper` | The only code that runs as root; validates every argument |
 | `install-helper.sh` | Installs the helper and its `sudoers` rule |
 
 ## Debug screenshots
 
-Debug builds can render the console with fake data without touching the network:
+Debug builds can render the console with fake data. Demo mode never calls the privileged helper, so it is safe to run while a real tunnel is up.
 
 ```bash
 swift build
-GELEIT_DEMO=connected GELEIT_SNAPSHOT=/tmp/geleit.png .build/debug/Geleit
+GELEIT_DEMO=connected GELEIT_RENDER=/tmp/geleit.png .build/debug/Geleit     # offscreen, works with the screen locked
+GELEIT_DEMO=connected GELEIT_SNAPSHOT=/tmp/geleit.png .build/debug/Geleit   # captures the real window (screen unlocked)
 ```
 
-`GELEIT_DEMO` accepts `connected`, `reconnecting`, `failed` or `idle`. The screen must be unlocked.
+`GELEIT_DEMO` accepts `connected`, `reconnecting`, `failed` or `idle`.

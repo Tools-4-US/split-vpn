@@ -22,6 +22,12 @@ enum DebugSnapshot {
         guard let demo else { return }
         store.replaceForDemo(demoProfiles)
         tunnel.loadDemo(profile: demoProfiles[0], mode: demo)
+        if let path = ProcessInfo.processInfo.environment["GELEIT_RENDER"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                render(profile: demoProfiles[0], tunnel: tunnel, to: path)
+            }
+            return
+        }
         if let path = ProcessInfo.processInfo.environment["GELEIT_SNAPSHOT"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 // Janela encoberta não é desenhada pelo macOS; traz para a frente antes de capturar.
@@ -30,6 +36,35 @@ enum DebugSnapshot {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { snapshot(to: path) }
         }
+    }
+
+    /// Renderiza o painel fora da tela (ImageRenderer): não depende de janela visível
+    /// nem de tela desbloqueada — serve para gerar as imagens do README, inclusive no CI.
+    @MainActor
+    static func render(profile: VPNProfile, tunnel: TunnelController, to path: String) {
+        let live = tunnel.phase == .connected
+        let content = VStack(spacing: 18) {
+            HeroCard(profile: profile, phase: tunnel.phase, onEdit: {})
+            if live {
+                StatsRow(traffic: tunnel.traffic)
+                TrafficChartCard(traffic: tunnel.traffic)
+            }
+            DetailsCard(profile: profile, live: live)
+        }
+        .padding(28)
+        .frame(width: 1000)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .environmentObject(tunnel)
+        .environment(\.colorScheme, .dark)
+
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = 2
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        if let cg = renderer.cgImage {
+            let rep = NSBitmapImageRep(cgImage: cg)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        }
+        NSApp.terminate(nil)
     }
 
     @MainActor

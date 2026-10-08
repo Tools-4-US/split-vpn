@@ -27,9 +27,10 @@ struct ProfileEditor: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: "shield.lefthalf.filled")
-                    .font(.system(size: 22))
-                    .foregroundStyle(Theme.accent)
+                PennantMark()
+                    .frame(width: 26, height: 26)
+                    .padding(5)
+                    .background(Theme.heroGradient, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(isNew ? "Nova conexão" : "Editar conexão").font(.title3.weight(.semibold))
                     Text("SSL-VPN compatível com FortiGate").font(.caption).foregroundStyle(.secondary)

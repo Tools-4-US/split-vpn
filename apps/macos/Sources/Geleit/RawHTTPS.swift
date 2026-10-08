@@ -75,6 +75,33 @@ enum RawHTTPS {
         }
     }
 
+    /// O gateway aceita conexão TCP? Evita abrir o navegador (ou gastar tentativa) sem rede.
+    static func canReach(host: String, port: Int, timeout: TimeInterval = 5) async -> Bool {
+        guard let nwPort = NWEndpoint.Port(rawValue: UInt16(clamping: port)) else { return false }
+        let conn = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: .tcp)
+        let queue = DispatchQueue(label: "geleit.reach")
+        return await withCheckedContinuation { cont in
+            let once = OnceFlag()
+            conn.stateUpdateHandler = { state in
+                switch state {
+                case .ready: if once.take() { conn.cancel(); cont.resume(returning: true) }
+                case .failed, .waiting: if once.take() { conn.cancel(); cont.resume(returning: false) }
+                default: break
+                }
+            }
+            conn.start(queue: queue)
+            queue.asyncAfter(deadline: .now() + timeout) {
+                if once.take() { conn.cancel(); cont.resume(returning: false) }
+            }
+        }
+    }
+
+    private final class OnceFlag: @unchecked Sendable {
+        private var done = false
+        private let lock = NSLock()
+        func take() -> Bool { lock.lock(); defer { lock.unlock() }; if done { return false }; done = true; return true }
+    }
+
     static func parse(_ data: Data) -> Response {
         let text = String(decoding: data, as: UTF8.self)
         let head = text.components(separatedBy: "\r\n\r\n").first ?? text
