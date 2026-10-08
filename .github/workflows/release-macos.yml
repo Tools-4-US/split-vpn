@@ -1,0 +1,60 @@
+# Publica o app macOS nos GitHub Releases a cada tag v* (ex.: git tag v0.2.0 && git push --tags).
+# O zip fica em https://github.com/<owner>/<repo>/releases/latest/download/Geleit-macOS.zip
+name: Release macOS
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag existente a publicar (ex.: v0.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Versão
+        id: version
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build universal + zip
+        working-directory: apps/macos
+        run: VERSION="${{ steps.version.outputs.version }}" ./build.sh --zip
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Instalação (macOS 14+, Apple Silicon e Intel)
+
+          1. `brew install openfortivpn`
+          2. Baixe **Geleit-macOS.zip**, descompacte e mova **Geleit.app** para `/Applications`.
+          3. O app é assinado ad hoc (sem notarização da Apple). Na primeira abertura, libere em
+             **Ajustes do Sistema → Privacidade e Segurança → Abrir Mesmo Assim**, ou rode:
+             `xattr -dr com.apple.quarantine /Applications/Geleit.app`
+          4. Instale o componente de sistema (uma vez):
+             `sudo "/Applications/Geleit.app/Contents/Resources/install-helper.sh"`
+
+          Confira o download com `shasum -a 256 -c Geleit-macOS.zip.sha256`.
+          NOTES
+          sed -i '' 's/^          //' notes.md
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" apps/macos/build/Geleit-macOS.zip apps/macos/build/Geleit-macOS.zip.sha256 --clobber
+          else
+            gh release create "$TAG" apps/macos/build/Geleit-macOS.zip apps/macos/build/Geleit-macOS.zip.sha256 \
+              --title "Geleit $TAG" --notes-file notes.md --generate-notes
+          fi

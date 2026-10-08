@@ -1,16 +1,19 @@
 #!/bin/bash
-# Compila e empacota o Geleit.app (assinatura ad-hoc, uso local).
+# Compila e empacota o Geleit.app (binário universal arm64 + x86_64, assinatura ad-hoc).
 #   ./build.sh            → build/Geleit.app
+#   ./build.sh --zip      → também build/Geleit-macOS.zip + .sha256 (para distribuição)
 #   ./build.sh --install  → também copia para /Applications
+# VERSION=1.2.3 ./build.sh define a versão exibida no app (padrão: 0.0.0-dev).
 set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="build/Geleit.app"
-swift build -c release
+VERSION="${VERSION:-0.0.0-dev}"
+swift build -c release --arch arm64 --arch x86_64
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/Geleit "$APP/Contents/MacOS/Geleit"
+cp .build/apple/Products/Release/Geleit "$APP/Contents/MacOS/Geleit"
 
 # Ícones fornecidos (opcionais): MenuBarIcon*.pdf|svg|png e AppIcon.icns ou AppIcon.png (1024x1024)
 shopt -s nullglob
@@ -29,7 +32,7 @@ elif [[ -f Resources/AppIcon.png ]]; then
 fi
 [[ -f "$APP/Contents/Resources/AppIcon.icns" ]] && ICON_KEY="<key>CFBundleIconFile</key><string>AppIcon</string>"
 
-VERSION=$(git describe --tags --always 2>/dev/null || echo 0.1.0)
+BUILD=$(git rev-parse --short HEAD 2>/dev/null || echo local)
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -40,8 +43,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>io.github.tools4us.geleit</string>
   <key>CFBundleExecutable</key><string>Geleit</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
-  <key>CFBundleVersion</key><string>${VERSION}</string>
+  <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+  <key>CFBundleVersion</key><string>${BUILD}</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
@@ -53,7 +56,15 @@ PLIST
 codesign --force --deep --sign - "$APP" >/dev/null
 echo "OK: $APP"
 
-if [[ "${1:-}" == "--install" ]]; then
+if [[ " $* " == *" --zip "* ]]; then
+  ZIP="build/Geleit-macOS.zip"
+  rm -f "$ZIP" "$ZIP.sha256"
+  ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
+  (cd build && shasum -a 256 "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
+  echo "OK: $ZIP ($(du -h "$ZIP" | cut -f1))"
+fi
+
+if [[ " $* " == *" --install "* ]]; then
   pkill -x Geleit 2>/dev/null && sleep 1 || true
   rm -rf "/Applications/Geleit.app"
   cp -R "$APP" /Applications/

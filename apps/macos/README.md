@@ -10,11 +10,21 @@ Native SwiftUI menu bar app. macOS 14 (Sonoma) or later.
 ## Build and install
 
 ```bash
-./build.sh            # → build/Geleit.app
-./build.sh --install  # also copies it to /Applications
+./build.sh                     # → build/Geleit.app (universal: arm64 + x86_64)
+./build.sh --zip               # also build/Geleit-macOS.zip + .sha256
+./build.sh --install           # also copies it to /Applications
+VERSION=0.2.0 ./build.sh --zip # version shown by the app (default 0.0.0-dev)
 ```
 
-The app is signed ad hoc for local use. Then install the privileged helper once:
+The app is signed ad hoc (not notarized).
+
+## Releases
+
+Pushing a tag `v*` runs [`release-macos.yml`](../../.github/workflows/release-macos.yml), which builds the universal app and attaches `Geleit-macOS.zip` and its checksum to a GitHub Release:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+``` Then install the privileged helper once:
 
 ```bash
 sudo "/Applications/Geleit.app/Contents/Resources/install-helper.sh"

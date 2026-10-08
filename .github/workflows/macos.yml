@@ -25,10 +25,7 @@ jobs:
           shellcheck -S warning -e SC2024 build.sh install-helper.sh helper/geleit-helper
 
       - name: Build e empacotamento
-        run: ./build.sh
-
-      - name: Compactar o app
-        run: ditto -c -k --keepParent build/Geleit.app build/Geleit-macOS.zip
+        run: VERSION="0.0.0-${GITHUB_SHA::7}" ./build.sh --zip
 
       - uses: actions/upload-artifact@v7
         with:

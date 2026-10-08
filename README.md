@@ -41,12 +41,27 @@ This is a monorepo meant to host one client per platform, sharing the same profi
 
 ## Quick start (macOS)
 
+### Download
+
+**[⬇ Geleit-macOS.zip](https://github.com/Tools-4-US/split-vpn/releases/latest/download/Geleit-macOS.zip)** — universal (Apple Silicon and Intel), macOS 14+. All versions on the [Releases](https://github.com/Tools-4-US/split-vpn/releases) page, each with a SHA-256 checksum.
+
+```bash
+brew install openfortivpn
+# unzip and move Geleit.app to /Applications, then:
+xattr -dr com.apple.quarantine /Applications/Geleit.app               # app is ad-hoc signed, not notarized
+sudo "/Applications/Geleit.app/Contents/Resources/install-helper.sh"   # one-time, see "Security model"
+```
+
+Instead of `xattr`, you can open the app once and allow it under **System Settings → Privacy & Security → Open Anyway**.
+
+### Build from source
+
 ```bash
 brew install openfortivpn
 git clone https://github.com/Tools-4-US/split-vpn.git geleit
 cd geleit/apps/macos
 ./build.sh --install                                                   # builds and copies Geleit.app to /Applications
-sudo "/Applications/Geleit.app/Contents/Resources/install-helper.sh"   # one-time, see "Security model"
+sudo "/Applications/Geleit.app/Contents/Resources/install-helper.sh"
 ```
 
 Open **Geleit**, click **+**, fill in your gateway and the networks to route, and connect from the window or the menu bar. Details in [`apps/macos/README.md`](apps/macos/README.md).
